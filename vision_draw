@@ -6,6 +6,7 @@ from viam.robot.client import RobotClient
 from viam.rpc.dial import Credentials, DialOptions
 from viam.components.gantry import Gantry
 from viam.services.vision import VisionClient
+import signal, sys
 
 async def connect():
     creds = Credentials(
@@ -50,6 +51,8 @@ async def main():
     logger = logging.getLogger("axidraw")
 
     axidraw = Gantry.from_robot(robot, "axidraw")
+    await axidraw.home()
+
     vision = VisionClient.from_robot(robot, "detector")
 
     n = 50  ##number of random lines
@@ -57,27 +60,57 @@ async def main():
     Y1 = []
     X2 = []
     Y2 = []
-    maxX = 175 #in mm
-    maxY = 150 # in mm 
+    maxX = 200 #in mm
+    maxY = 120 # in mm 
 
-    detections = await vision.get_detections_from_camera("transform")
-    number_of_people = 0
-    for detection in detections:
-        if detection.class_name == "Person":
-            number_of_people += 1
-    multiplier = .7 * number_of_people
-    print(number_of_people, multiplier)
+    async def get_multiplier() -> int:
+        detections = await vision.get_detections_from_camera("transform")
+        number_of_people = 0
+        for detection in detections:
+            # print(detection)
+            if detection.class_name == "Person" and detection.confidence > 0.7:
+                number_of_people += 1
+        multiplier = .1 * number_of_people
+        # print(multiplier, number_of_people)
+        return number_of_people
 
-    for _ in range(n):
-        X1.append(random.randint(0, maxX) * multiplier)
-        Y1.append(random.randint(0, maxY) * multiplier)
-        X2.append(random.randint(0, maxX) * multiplier)
-        Y2.append(random.randint(0, maxY) * multiplier)
-    
-    for i in range(n):
-        await draw_line(axidraw, mm2inch(X1[i]), mm2inch(Y1[i]), mm2inch(X2[i]), mm2inch(Y2[i]))
+    MAX_PPL = 4
+    while True:
+        try:
+            multiplier = await get_multiplier()
+            if multiplier > MAX_PPL:
+                multiplier = MAX_PPL
+
+            X1 = random.randint(0, maxX*(multiplier+1)//MAX_PPL)
+            y_min = 0 if X1 > (maxX*(multiplier)//MAX_PPL) else maxY*(multiplier)//MAX_PPL
+            Y1 = random.randint(y_min, maxY*(multiplier+1)//MAX_PPL)
+
+            X2 = random.randint(0, maxX*(multiplier+1)//MAX_PPL)
+            y_min = 0 if X2 > (maxX*(multiplier)//MAX_PPL) else maxY*(multiplier)//MAX_PPL
+            Y2 = random.randint(y_min, maxY*(multiplier+1)//MAX_PPL)
+            
+            # X1 = (random.randint(maxX*multiplier//MAX_PPL, maxX*(multiplier+1)//MAX_PPL)) + (maxX//MAX_PPL*multiplier)
+            # Y1 = (random.randint(maxY*multiplier//MAX_PPL, maxY*(multiplier+1)//MAX_PPL)) + (maxY//MAX_PPL*multiplier)
+            # X2 = (random.randint(maxX*multiplier//MAX_PPL, maxX*(multiplier+1)//MAX_PPL)) + (maxX//MAX_PPL*multiplier)
+            # Y2 = (random.randint(maxY*multiplier//MAX_PPL, maxY*(multiplier+1)//MAX_PPL)) + (maxY//MAX_PPL*multiplier)
+            print(X1, Y1, X2, Y2)
+            await draw_line(axidraw, mm2inch(X1), mm2inch(Y1), mm2inch(X2), mm2inch(Y2))
+        except Exception as e:
+            print(e)
+            await axidraw.home()
+            break
+
+    # for i in range(n):
+    #     await draw_line(axidraw, mm2inch(X1[i]), mm2inch(Y1[i]), mm2inch(X2[i]), mm2inch(Y2[i]))
 
     await robot.close()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    loop = asyncio.get_event_loop()
+    main_task = asyncio.ensure_future(main())
+    for signal in [signal.SIGINT, signal.SIGTERM]:
+        loop.add_signal_handler(signal, main_task.cancel)
+    try:
+        loop.run_until_complete(main_task)
+    finally:
+        loop.close()
