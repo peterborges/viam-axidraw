@@ -51,18 +51,6 @@ async def main():
     logger = logging.getLogger("axidraw")
 
     axidraw = Gantry.from_robot(robot, "axidraw")
-    # axis = await axidraw.get_lengths()
-    # start = await axidraw.get_position()
-    
-    # minX, maxX, minY, maxY, z = 0, 4, 0, 7, 0
-    # # make sure its at the origin
-    # await axidraw.move_to_position([0, 0, 0], [])
-    # while True:
-    #     nextX = getValue(minX, maxX)
-    #     nextY = getValue(minY, maxY)
-    #     print(f"move to {nextX} - {nextY}")
-    #     _ = await axidraw.move_to_position([nextX, nextY, z], [])
-    # # Don't forget to close the robot when you're done!
 
     n = 500  ##number of random lines
     X1 = []
@@ -70,7 +58,7 @@ async def main():
     X2 = []
     Y2 = []
     maxX = 175 #in mm
-    maxY = 150 # in mm 
+    maxY = 120 # in mm 
     for _ in range(n):
         X1.append(random.randint(0, maxX))
         Y1.append(random.randint(0, maxY))

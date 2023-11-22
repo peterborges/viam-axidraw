@@ -64,18 +64,20 @@ async def main():
     #     _ = await axidraw.move_to_position([nextX, nextY, z], [])
     # # Don't forget to close the robot when you're done!
 
-    n = 500  ##number of random lines
+    n = 30  ##number of  lines
     X1 = []
     Y1 = []
     X2 = []
     Y2 = []
     maxX = 175 #in mm
-    maxY = 150 # in mm 
-    for _ in range(n):
-        X1.append(random.randint(0, maxX))
-        Y1.append(random.randint(0, maxY))
-        X2.append(random.randint(0, maxX))
-        Y2.append(random.randint(0, maxY))
+    maxY = 120 # in mm 
+    quantum = maxY/n
+    for i in range(n):
+        X1.append(quantum*i)
+        Y1.append(0)
+
+        X2.append(0)
+        Y2.append(quantum*(n-i))
     
     for i in range(n):
         await draw_line(axidraw, mm2inch(X1[i]), mm2inch(Y1[i]), mm2inch(X2[i]), mm2inch(Y2[i]))
